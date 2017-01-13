@@ -205,7 +205,7 @@ def GibbsSampler(dna, k, t, N):
         i = random.randrange(t)
         profile = profile(motifs[:i] + motifs[i + 1:])
         motifs[i] = most_probable_profile(dna[i], profile, k)
-        if score(motifs) < score(bestmotifs):
+        if Score(motifs) < Score(bestmotifs):
             bestmotifs = motifs
 
     return bestmotifs

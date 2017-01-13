@@ -9,12 +9,11 @@ def show(matrix):
 
 def linear_scoring(v, w, sigma, score_dict):
     '''Linear scoring for first half'''
-    i, j = len(v), len(w)
     # initialize and seed with penalties
-    s = [[] for _ in range(j + 1)]
+    s = [[] for _ in range(len(w) + 1)]
     # scoring
-    for x in range(i + 1):
-        for y in range(j + 1):
+    for x in range(len(v) + 1):
+        for y in range(len(w) + 1):
             if y == 0 or x == 0:
                 s[y] = [-sigma * y, - sigma * x]
             else:

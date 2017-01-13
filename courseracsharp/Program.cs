@@ -1,7 +1,4 @@
 ﻿using System;
-using System.IO;
-using System.Linq;
-using System.Collections.Generic;
 
 namespace Coursera
 {
@@ -9,14 +6,13 @@ namespace Coursera
     {
         public static void Main()
         {
-            string path = Directory.GetCurrentDirectory() + "\\text.txt"; //Windows
-            //string path = Directory.GetCurrentDirectory() + "//text.txt"; //UNIX
-            FileStream stream = new FileStream(path, FileMode.Open);
-            StreamReader file = new StreamReader(stream);
-            string[] data = file.ReadToEnd().Split(new char[2] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-            int n = int.Parse(data[0]);
-            List<List<int>> matrix = new Graph(data.ToList().GetRange(1, data.Length - 1)).DistanceBetweenLeaves(n);
-            foreach (List<int> row in matrix) System.Console.WriteLine(string.Join(" ", row.Select(x => x.ToString())));
+            string str1 = "PLEASANTLY";
+            string str2 = "MEASNLY";
+            var answer = new Coursera.LinearSpaceAlignment(str1, str2, 5, new Coursera.Score().BLOSUM62);
+            answer.GlobalAlignment();
+            Console.WriteLine(answer.score);
+            Console.WriteLine(answer.v_aligned);
+            Console.WriteLine(answer.w_aligned);
         }
     }
 }
