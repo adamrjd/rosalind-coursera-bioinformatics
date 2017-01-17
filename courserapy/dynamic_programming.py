@@ -16,7 +16,6 @@ def scoring(sigma, score_dict, v, w, local=False):
     # fill in penalties
     [s[x].__setitem__(0, -sigma * x) for x in range(1, i + 1)]
     [s[0].__setitem__(y, -sigma * y) for y in range(1, j + 1)]
-
     # create alignment scoring matrix
     for x in range(1, i + 1):
         for y in range(1, j + 1):
@@ -27,6 +26,7 @@ def scoring(sigma, score_dict, v, w, local=False):
                 if s[x][y] > max_pos[0]:
                     max_pos[0] = s[x][y]
                     max_pos[1] = [x, y]
+
     if local:
         return s, backtrack, max_pos
     return s, backtrack
@@ -36,22 +36,22 @@ def global_alignment(sigma, score_dict, v, w):
     i, j = [len(v), len(w)]
     score = 0
     s, backtrack = scoring(sigma, score_dict, v, w)
-    insert = lambda word, i: word[:i] + '-' + word[i:]
+    indel = lambda word, i: word[:i] + '-' + word[i:]
     score = s[i][j]
     while i * j != 0:
         if backtrack[i][j] == 0:
             i -= 1
-            w = insert(w, j)
+            w = indel(w, j)
         elif backtrack[i][j] == 1:
             j -= 1
-            v = insert(v, i)
+            v = indel(v, i)
         else:
             i -= 1
             j -= 1
     for _ in range(i):
-        w = insert(w, 0)
+        w = indel(w, 0)
     for _ in range(j):
-        v = insert(v, 0)
+        v = indel(v, 0)
     return score, v, w
 
 
@@ -224,4 +224,6 @@ def multiple_sequence_alignment(v, w, u):
 
 if __name__ == "__main__":
     from dataimport import Score
-    print(global_alignment(-5, Score().BLOSUM62, 'GAGC', 'ACTT'))
+    str1 = 'PLEASANTLY'
+    str2 = 'MEANLY'
+    print(scoring(5, Score().BLOSUM62, str1, str2))

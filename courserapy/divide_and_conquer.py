@@ -9,60 +9,71 @@ def show(matrix):
 
 def linear_scoring(v, w, sigma, score_dict):
     '''Linear scoring for first half'''
-    i, j = len(v), len(w)
     # initialize and seed with penalties
-    s = [[] for _ in range(j + 1)]
+    # this time we are actually splitting the vertical matrix
+    # and adding one row at a time vertically
+    s = [[-sigma * _] for _ in range(len(v) + 1)]
+    backtrack = [None for _ in range(len(v) + 1)]
+
     # scoring
-    for x in range(i + 1):
-        for y in range(j + 1):
-            if y == 0 or x == 0:
-                s[y] = [-sigma * y, - sigma * x]
+    for y in range(1, len(w) + 1):
+        for x in range(len(v) + 1):
+            if x == 0:
+                s[x].append(-sigma * y)
             else:
-                if v[x - 1] == w[y - 1]:
-                    score = s[y - 1][0] + score_dict[v[x - 1]][w[y - 1]]
-                else:
-                    score = max(s[y][0], s[y - 1][1])
-                s[y].append(score)
-                s[y].pop(0)
-    return s
+                scores = (s[x - 1][1] - sigma,  # right
+                          # compensate for len being 1 starting off
+                          s[x][len(s[x]) - 1] - sigma,  # down
+                          s[x - 1][0] + score_dict[v[x - 1]][w[y - 1]])  # diag
+
+                score = max(scores)
+                s[x].append(score)
+                backtrack[x] = scores.index(score)
+
+            if len(s[x]) > 2:
+                s[x].pop(0)
+
+    return s, backtrack
 
 
 def middle_edge(v, w, sigma, score_dict):
     def get_edge(v, w, sigma, score_dict):
-        v, w = w, v
-        i, j = len(v) + 1, len(w) + 1
-        jcol = int((i - 1) / 2)
+        '''
+        The course actually sets it up so that the v string is on the vertical axis,
+        and the w string is on the horizontal axis. I think this makes zero sense, and
+        is much harder to reason about, so I flipped it.
+        '''
+
+        # will only ever catch len(w) == 2 b/c of outer return condition
+        jcol = len(w) // 2 if len(w) > 2 else 1
 
         # scoring matrices for left and right
-        s = linear_scoring(v[:jcol], w, sigma, score_dict)
-        r_s = [_ for _ in reversed(linear_scoring(
-            v[jcol:][::-1], w[::-1], sigma, score_dict))]
+        rfoldr = lambda l: list(l)[::-1] if isinstance(l, list) else l
+        s = linear_scoring(v, w[:jcol], sigma, score_dict)[0]
+        r_s, backtrack = [
+            [rfoldr(_) for _ in __] for __ in
+            linear_scoring(v[::-1], w[jcol:][::-1], sigma, score_dict)]
+
         max_score = -float('inf')
-        # right, diag, down
-        right_nodes = [float('inf'), float('inf'), float('inf')]
-        for y in range(jcol + 1):
-            node = s[y][1] + r_s[y][0]
-            if node > max_score:
-                l_node = (y, jcol)  # since we reversed v and w
-                max_score = node
-                right_nodes[0] = r_s[y][1]
-                if j > y + 1:
-                    right_nodes[1] = r_s[y + 1][1]
-                    right_nodes[2] = s[y + 1][1] + r_s[y + 1][0]
-                else:
-                    right_nodes[1], right_nodes[2] = [float('inf')] * 2
-        if right_nodes[1] < right_nodes[2]:  # diag
-            r_node = (l_node[0] + 1, l_node[1] + 1)
-        else:  # right
-            r_node = (l_node[0] + 1, l_node[1])
-        return [l_node, r_node]
-    return None if len(w) <= 1 else get_edge(v, w, sigma, score_dict)
+        node = None
+        for x in range(len(w) + 1):
+            score = s[x][1] + r_s[x][0]
+            if score > max_score:
+                node, max_score = [(x, jcol), score]
+
+        dirs = [tuple(map(sum, zip(node, _)))
+                for _ in [(1, 0), (0, 1), (1, 1)]]
+
+        return (node, dirs[backtrack[node[0]]])
+    return (None, None) if len(w) <= 1 else get_edge(v, w, sigma, score_dict)
 
 
 class LinearSpaceAlignment(object):
     '''
-    Because of the way this problem is formulated, linear space alignment imo is best handled as a class...
-    that way, there are no side effects from mutating v and w during recursion
+    Because of the way this problem is formulated, linear space alignment imo is best handled as a
+    class...that way, there are no side effects from mutating v and w during recursion (at least
+    in py3; in py2 you could have used the leaky 'lexical' scope bindings to simulate this same
+    concept)
     '''
 
     def __init__(self, v, w, sigma, score_dict):
@@ -72,36 +83,42 @@ class LinearSpaceAlignment(object):
         self.score_dict = score_dict
 
     def global_align(self):
-        def recurse(self, top, bottom, left, right):
+        def recurse(self, left, right, top, bottom):
             from dynamic_programming import global_alignment
             # right block empty, want to now align this segment
-            if left == right:
-                return [self.v[top:bottom], '-' * (bottom - top)]
+            if top == bottom:
+                return [self.v[left:right], '-' * (right - left)]
             # left block empty, want to now align this segment
-            elif top == bottom:
-                return ['-' * (right - left), self.w[left:right]]
+            elif left == right:
+                return ['-' * (bottom - top), self.w[top:bottom]]
 
-            # trivial cases
+            # trivial cases exit recursion here
             elif bottom - top == 1 or right - left == 1:
                 return global_alignment(self.sigma, self.score_dict,
-                                        self.v[top:bottom], self.w[left:right])[1:]
+                                        self.v[left:right], self.w[top:bottom])[1:]
             else:
-                mid_node, next_node = middle_edge(
-                    self.v[top:bottom], self.w[left:right], self.sigma, self.score_dict)
+                node, edge = middle_edge(
+                    self.v[left:right], self.w[top:bottom], self.sigma, self.score_dict)
 
-                # shift nodes
-                mid_node = tuple(map(sum, zip(mid_node, [top, left])))
-                next_node = tuple(map(sum, zip(next_node, [top, left])))
+                # shift nodes from local source to global source
+                node = tuple(map(sum, zip(node, [left, top])))
+                edge = tuple(map(sum, zip(edge, [left, top])))
 
                 # representation of middle node in v and w
-                current = [['-', self.v[mid_node[0] % len(self.v)]][next_node[0] - mid_node[0]], [
-                    '-', self.w[mid_node[1] % len(self.w)]][next_node[1] - mid_node[1]]]
+                current = [
+                    ['-', self.v[node[0]]][edge[1] - node[1]],
+                    ['-', self.w[node[1]]][edge[0] - node[0]]
+                ]
 
-                # generate alignment from left and right subtrees
+                # generate next subalignment from left and right subtrees
                 A = recurse(self,
-                            top, mid_node[0], left, mid_node[1])
+                            left, node[0], top, node[1])
+
                 B = recurse(self,
-                            next_node[0], bottom, next_node[1], right)
+                            edge[0], right,
+                            edge[1], bottom)
+
+                # zip left and right together recursively
                 return [A[i] + current[i] + B[i] for i in range(2)]
 
         self.v, self.w = recurse(self, 0, len(self.v), 0, len(self.w))
@@ -114,11 +131,11 @@ class LinearSpaceAlignment(object):
         pass
 
 if __name__ == "__main__":
-    str2 = 'PLEASANTLY'
-    str1 = 'MEANLY'
+    str1 = 'TWLNSACYGVNFRRLNPMNKTKWDCWTWVPMVMAAQYLCRIFIPVMDHWEFFGDWGLETWRLGIHDHVKIPNFRWSCELHIREHGHHFKTRFLKHNQFTQCYGLMPDPQFHRSYDVACQWEVTMSQGLMRFHRQNQIEKQRDRTSTYCMMTIGPGFTSNGYDPFVTITITPVQEPVENWFTPGGSMGFMIISRYMQMFFYLTRFSDMTYLVGVHCENYVCWNNVAKFLNGNLQGIFDQGERAYHQFVTWHSYSQYSRCSVGRYACEQAMSRVNSKMTWHWPIRDQGHEHFSEQYLSEKRNPPCNPRIGNAGQHFYEIHRIAHRVAMCNWAPQGQHPGGPTPHDVETCLWLWSLCLKGSDRGYVDRPWMFLADQLGEANLTLITMFHGCTRGCLMWFMDWEECVCSYSVVNPRCHGSEQWSVQNLGWRTCDTLISLWEPECDKHNTPPCLHWEFEDHPSQLRPVMMCDKYVQSIPTDAKWAWTYSKDFVISHWLIWTPIKLEECVFPQINRLWGTACNQGSQKIVIQNVWLRPSSFFQERSKCSDSSCILNVGGSNVNITGKETRTHVPILHMHEIDLISTASSGMRHNLILPHGMLMLHMNWHHSTRAMNPYSSLKLIPWTFQVCETDDRDQNVATHVADPCHKGEDQEIRCCKGGVDHQWKGDRMWMMCMPDMNYVKQDQAPSGTCEGACENYPADKDKCYMIFTIVFDYRRCTKKVCIWISGFPVDAFNLISIANAGFFCCWLEPTELKWRRTFYLGKGTQGWMCTFPHRNIIPVIICAGFGRWVQGEVPFRPVAQISAHSSDRRQGHHPPGTNMCHDYGDQYPIKRVGMQVEEDDGASYCDCAADWKLADMYEADHLSIGVIDFTDWIYPKNGGIWSEIIKSHFHWYHWETPQNTVGAFNTIVGINGSDMCIYHGNTQWEFGWCWKWLNHGHMRNQGPCHLGILEGRISKFAQVTSWWWQTKHDKDWSIEPYGRHWGEAGRPYTYNYCWMRWAIVYNHGNVISVELVPFMDEYPGKCNKEDVQFELFSPMQA'
+    str2 = 'LWFKFLQCIFQYFKDQQETNCIWTFSPFSEHICQRVCQVYWNWNTPSSRTSDPRELFANSTIHNNRCGEWRYMFYHTRTLVQTAPLMKETLHSDGKHSMYCEQRHFFRSSYLIKVNYDVSHYLELYTFSEIPWKLTTHGWDGFSWFLLVNSCCTFDIDGKCGILSQCGMSRAFRTRQEDAYHFQTSLMHLHLHLHVQEGKHEKADLFAQFYNMLPMHGGTCGRNTEPSDLFDSATMNKYMAEHPASCKACPNVSKECFVYWWSHDFTKKHKLIEFSCGRDTGQTTQRTWNVDENEGGKWIWRFHYFMRAKALQIDPKFKPYWNEPRAIMRPGHVTAAPCICAQHSQNETAVCNRDQMHIHAIEFQQYHSRAFGEVQTWCDIGKENENDFIYEQHWWLVGGTEGMAGVIWKFVCARCRTQDCDFWKTCLTYSAQPMMKVYDTIFYVNSINPWEFEDHPSQCDKCVQSIPTDAKYAICGKFVISHWLYWTPQKFEECVHNNVRCAPMGNRLWGTACMVIQNVWLRPSMGSHFSCILNVGGSNINIQGKETWTHVPILHMHEIDLISTASSGMETCKPCFLSGPTIHMGFSYEIRAQPYSRDYFCMDWMQEADEVDHNRCETVQPTLPLLQQFEWKTSCMGQRWITIFCDHCQIVCFSTFFCVMPTFLPNTSILDKFYCIYLSISWTHYCNVHALGFIMRLHYSYMGWKEHKRMHAWDIGLDELWAQEGIQRAQLWCGDEFEVAKYPEWITEARTAIATRPWFHNCYIKPWWIREKHLWFGKESKLDHGHRGAMFTPVANDNTEWMHHWYMFCWAGSKNRLKRQIKEKLIFIIKFMITEFGLFLMIDYTQCYIAWMWAYTGIACYIDWEKCLKHDLTTTDLGCCVYRLFKWYEVRHRAPPQVNTRLPWSQIPMVAIQCNIVDECKEQWHFSYKASFVVEYLCPGCCTNGNRWQWYQVKETPFMYAFAASIFGFHHENLVVFITGSVTIPNGLFGCIAWTSPKPVQKTPASANTIIAYDKCILMG'
     penalty = 5
     score_matrix = Score().BLOSUM62
-    answer = LinearSpaceAlignment(
+    print(middle_edge(str1, str2, penalty, score_matrix))
+    '''answer = LinearSpaceAlignment(
         str1, str2, penalty, score_matrix).global_align()
-
-    print(answer[1:][::-1], answer[0])
+    print(answer)'''
