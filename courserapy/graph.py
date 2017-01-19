@@ -7,14 +7,20 @@ Written in: Python35
 
 class Graph(object):
     '''Creates graphs in python collections from genetic data'''
-    adjlist = dict()
+    from utils import nested_dict
+    adjlist = nested_dict()
     leaves = list()
     matrix = None  # sometimes consuming matrix not graph
 
     def __init__(self, data, graph_type="weighted_graph"):
         if graph_type == "weighted_graph":
-            # data = list("0:1->2","1:2->3",..."row_n")
-            self.adjlist = Graph.consume(data)
+            # data = list("0->1:2","1->2:3",..."row_n->etc->etc")
+            from re import split
+            for edge in data:
+                _ = list(filter(lambda _: _ != '',
+                                split(r'[:\->]', edge)))
+                _ = _ if len(_) == 3 else _.append(1)  # if no weight, add 1
+                self.adjlist[_[0]][_[1]] = _[2]
             vals = [_ for __ in [val.keys() for val in self.adjlist.values()]
                     for _ in __]
             self.leaves = [leaf for leaf in set(vals) if vals.count(leaf) <= 1]
@@ -25,8 +31,11 @@ class Graph(object):
                 for j, weight in enumerate(row.split(" ")):
                     if i != j:
                         self.adjlist[int(i)] = {int(j): int(weight)}
+        elif graph_type == "genome":
+            # data = list("+1","-2",...,"+4")
+            pass
 
-    def pickle(self):
+    def adjlist_dict_to_strlist(self):
         if len(self.adjlist.keys()) != 0:
             adj_str_ls = list()
             while len(self.adjlist.keys()) > 0:
@@ -38,37 +47,16 @@ class Graph(object):
             return adj_str_ls
         return
 
-    @staticmethod
-    def consume(read_data):
-        '''
-        consumes graph string data in following format
-        ['node->node:weight','node->node:weight',...]
-        '''
-        d = dict()
-        for edge in read_data:
-            temp = edge.split('->')
-            temp.append(None)
-            if ':' not in temp[1]:
-                temp[1] += ':1'
-            temp[1], temp[2] = temp[1].split(':')
-            temp = [int(x) for x in temp]
-            if temp[0] in d:
-                d[temp[0]][temp[1]] = temp[2]
-            else:
-                d[temp[0]] = {temp[1]: temp[2]}
-        return d
-
     def distance_between_leaves(self, n):
         def Dijkstra(source, sink):
-            Q = list(self.adjlist.keys())
             nodes = list(self.adjlist.keys())
             dist_dict = {v: float('inf') for v in self.adjlist.keys()}
             dist_dict[source] = 0
             prev_node = dict()
-            while len(Q) > 0:
-                u = [node for node in Q if dist_dict[node] == min(
-                    [dist_dict[v] for v in dist_dict if v in Q])][0]
-                Q.remove(u)
+            while len(nodes) > 0:
+                u = [node for node in nodes if dist_dict[node] == min(
+                    [dist_dict[v] for v in dist_dict if v in nodes])][0]
+                nodes.remove(u)
                 for v in self.adjlist[u]:
                     alt = dist_dict[u] + self.adjlist[u][v]
                     if alt < dist_dict[v]:
@@ -96,8 +84,10 @@ class Graph(object):
 
     def additive_phylogeny(self, n, matrix):
         dist_theorem = lambda m, i, j, k: (m[i][j] + m[j][k] - m[i][k]) / 2
-        limb_length = lambda n, m: int(min([dist_theorem(
-            m, i, n - 1, k) for i in range(n) for k in range(n) if i != k and k != n - 1 and i != n - 1]))
+        limb_length = lambda n, m: int(min([dist_theorem(m, i, n - 1, k)
+                                            for i in range(n)
+                                            for k in range(n)
+                                            if i != k and k != n - 1 and i != n - 1]))
         node = n + 1
         adj_lst = None
         for i in range(n - 2):

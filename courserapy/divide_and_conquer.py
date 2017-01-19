@@ -13,7 +13,7 @@ def linear_scoring(v, w, sigma, score_dict):
     # dictionaries are much more efficient here since we
     # will still end up with very large data structures
     s = {(_, 0): -sigma * _ for _ in range(len(v) + 1)}
-    backtrack = {_: None for _ in range(len(v) + 1)}
+    backtrack = {_: 1 for _ in range(len(v) + 1)}
 
     # scoring
     for y in range(1, len(w) + 1):
@@ -29,22 +29,17 @@ def linear_scoring(v, w, sigma, score_dict):
                 score = max(scores)
                 s[(x, y)] = score
                 backtrack[x] = scores.index(score)
-            if y - 2 >= 0:
+            if y - 2 >= 0 and len(v) > 2:
                 s.pop((x, y - 2))
 
     return s, backtrack
 
 
 def middle_edge(v, w, sigma, score_dict):
-    def get_edge(v, w, sigma, score_dict):
-        '''
-        The course actually sets it up so that the v string is on the vertical axis,
-        and the w string is on the horizontal axis. I think this makes zero sense, and
-        is much harder to reason about, so I flipped it.
-        '''
-
-        # will only ever catch len(w) == 2 b/c of outer return condition
-        jcol = len(w) // 2 if len(w) > 2 else 1
+    if len(v) == 1 and len(w) == 1:
+        return (0, 0), (1, 1)
+    else:
+        jcol = len(w) // 2
 
         # scoring matrices for left and right
         s = linear_scoring(v, w[:jcol], sigma, score_dict)[0]
@@ -55,22 +50,20 @@ def middle_edge(v, w, sigma, score_dict):
         node = None
         # len(v) // 2 + 1 approximate bounds for 'longest path' since sometimes
         # the max score occurs after the node with the longest path
+        # also, need to account for special case where v very short and w long
+
         for x in range(len(v) // 2 + 1):
             score = s[(x, jcol)] + r_s[(len(v) - x, jcol)]
             if score > max_score:
                 node, max_score = [(x, jcol), score]
 
+        # diagonal, right, down directions for edge from node
         dirs = [tuple(map(sum, zip(node, _)))
                 for _ in [(1, 1), (1, 0), (0, 1)]]
 
-        # get edge from backtrack matrix iff v, w decent size, else right if
-        # len(v) > 2 else diagonal (since the final edge is always diag to
-        # sink)
-        edge = dirs[r_backtrack[
-            len(v) - node[0]]] if len(w) > 1 else dirs[0] if len(v) == 2 else dirs[2]
-
-        return (node, edge)
-    return (None, None) if len(w) < 1 else get_edge(v, w, sigma, score_dict)
+        # get edge from backtrack matrix
+        edge = dirs[r_backtrack[len(v) - node[0]]]
+    return (node, edge)
 
 
 class LinearSpaceAlignment(object):
@@ -79,6 +72,11 @@ class LinearSpaceAlignment(object):
     class...that way, there are no side effects from mutating v and w during recursion (at least
     in py3; in py2 you could have used the leaky 'lexical' scope bindings to simulate this same
     concept)
+
+    This works perfectly, but because the middle edge problem is formulated poorly middle_edge
+    breaks for edge cases, e.g. 'PL','M' aligns to 'PL','-M' but there is no "middle edge";
+    'L', 'M' should be 'L', '-M' for a global alignment of a particular string but the subalignment
+    is of course 'L','M'; 'LY','Y' aligns to 'LY','-Y' but again only two edges not three
     '''
 
     def __init__(self, v, w, sigma, score_dict):
@@ -109,9 +107,6 @@ class LinearSpaceAlignment(object):
                         self.sigma,
                         self.score_dict)]
 
-                if node is None:
-                    return ['', '']  # end of recursion
-
                 # representation of middle node in v and w
                 subalignment = [
                     ['-', self.v[node[0]]][edge[1] - node[1]],
@@ -122,8 +117,8 @@ class LinearSpaceAlignment(object):
                 A = recurse(self,
                             left, node[0], top, node[1])
 
-                # shift edge with current alignment...only for original entry
-                if (left, right, top, bottom) == (0, len(self.v), 0, len(self.w)):
+                # shift edge with current alignment if there is an indel
+                if '-' in subalignment:
                     edge = tuple(edge[_] - 1 if subalignment[_] == '-' else edge[_] + 1
                                  for _ in range(2))
 
@@ -131,7 +126,7 @@ class LinearSpaceAlignment(object):
                             edge[0], right,
                             edge[1], bottom)
 
-                # zip left and right together recursively...
+                # create alignment from subalignments
                 return [A[i] + subalignment[i] + B[i] for i in range(2)]
 
         self.v, self.w = recurse(self, 0, len(self.v), 0, len(self.w))
@@ -147,11 +142,9 @@ class LinearSpaceAlignment(object):
 if __name__ == "__main__":
     with open('input.txt', 'r') as f:
         str1, str2 = [line.strip() for line in f.readlines()]
-
     penalty = 5
     score_matrix = Score().BLOSUM62
-    answer = LinearSpaceAlignment(
-        str1, str2, penalty, score_matrix).global_align()
     with open('output.txt', 'w') as f:
-        for _ in answer:
+        for _ in LinearSpaceAlignment(
+                str1, str2, penalty, score_matrix).global_align():
             f.write(str(_) + '\n')
