@@ -51,33 +51,85 @@ def breakpoint_count(p):
     return points
 
 
-def two_break(p, q):
-    from math import fabs
-    cycles = lambda perm: len(perm.split(")("))
-    breaks = lambda perm: breakpoint_count(perm.replace(")(", " "))
-    return int(fabs((cycles(q) - breaks(q))))
-
-
 def chromosome_to_cycle(chromosome):
-    nodes = [0 for _ in range(2 * len(chromosome))]
+    try:
+        assert isinstance(chromosome, list)
+    except AssertionError:
+        # parse chromosome string if necessary
+        chromosome = [int(x) for x in chromosome.strip('()').split(' ')]
+
+    cycle = [0 for _ in range(len(chromosome) * 2)]
     for j, i in enumerate(chromosome):
+        i = int(i)
         if i > 0:
-            nodes[2 * j - 1] = 2 * i - 1
-            nodes[2 * j] = 2 * i
+            cycle[2 * j] = 2 * i - 1
+            cycle[2 * j + 1] = 2 * i
         else:
-            nodes[2 * j - 1] = -2 * i
-            nodes[2 * j] = -2 * i - 1
-    return [nodes.pop()] + nodes
+            cycle[2 * j] = -2 * i
+            cycle[2 * j + 1] = -2 * i - 1
+    return cycle
 
 
-def cycle_to_chromosome(nodes):
-    chromosomes = list()
-    for j in range(len(nodes) // 2):
-        if nodes[2 * j] < nodes[2 * j - 1]:
-            chromosomes.append(nodes[2 * j - 1] // 2)
+def cycle_to_chromosome(cycle):
+    try:
+        assert isinstance(cycle, list)
+    except AssertionError:
+        # parse cycle string if necessary
+        cycle = [int(x) for x in cycle.strip('()').split(' ')]
+
+    chromosome = [0 for _ in range(len(cycle) // 2)]
+    for j in range(len(cycle) // 2):
+        if cycle[2 * j] < cycle[2 * j + 1]:
+            chromosome[j] = cycle[2 * j + 1] // 2
         else:
-            chromosomes.append(- nodes[2 * j] // 2)
-    return chromosomes
+            chromosome[j] = - cycle[2 * j] // 2
+    return '(' + ' '.join(
+        ['+' + str(x) if x > 0 else str(x)
+         for x in chromosome]) + ')'
+
+
+def colored_edges(genome):
+    try:
+        assert isinstance(genome, list)
+    except AssertionError:
+        # parse genome string if necessary
+        from re import split
+        genome = [[int(x) for x in _.split(' ')]
+                  for _ in filter(lambda _: _ != '', split(r'[)(]', genome.strip('()')))]
+
+    edges = set()
+    for chromosome in genome:
+        cycle = chromosome_to_cycle(chromosome)
+        for j in range(len(chromosome)):
+            edges.add((cycle[2 * j - 1], cycle[2 * j]))
+    return list(sorted(edges, key=lambda _: _[0]))
+
+
+def genome_to_edges(genome):
+    return colored_edges(genome)
+
+'''def edges_to_genome(edges):
+    try:
+        assert isinstance(edges, list)
+    except AssertionError:
+        # parse edges string if necessary
+        edges = [[int(x) for x in _.strip('()').split(', ')]
+                 for _ in edges.split('), ')]
+
+    genome = set()
+    for cycle in edges:
+        nodes = [_ for _ in range(cycle[0], cycle[1] + 1)]
+        chromosome = cycle_to_chromosome(nodes)
+        genome.add(chromosome)
+    return genome'''
+
+
+def two_break(p, q):
+    blocks = lambda _: len([__ for __ in colored_edges(_) if __[1] < __[0]])
+    return blocks(q) - breakpoint_count(p)
+
 
 if __name__ == "__main__":
-    print(6 % 5)
+    with open('input.txt', 'r') as f:
+        genome1, genome2 = [line.strip() for line in f.readlines()]
+    print(two_break(genome1, genome2))

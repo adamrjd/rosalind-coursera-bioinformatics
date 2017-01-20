@@ -1,7 +1,7 @@
 '''
 Module for Coursera Bioinformatics IV
 Created by: Adam Dornford
-Written in: Python35
+Written in: Py35
 '''
 
 

@@ -1,4 +1,4 @@
-'''Written in Python3.5'''
+'''Written in Py35'''
 from dataimport import Score
 
 
@@ -36,9 +36,7 @@ def linear_scoring(v, w, sigma, score_dict):
 
 
 def middle_edge(v, w, sigma, score_dict):
-    if len(v) == 1 and len(w) == 1:
-        return (0, 0), (1, 1)
-    else:
+    def get_edge(v, w, sigma, score_dict):
         jcol = len(w) // 2
 
         # scoring matrices for left and right
@@ -63,7 +61,11 @@ def middle_edge(v, w, sigma, score_dict):
 
         # get edge from backtrack matrix
         edge = dirs[r_backtrack[len(v) - node[0]]]
-    return (node, edge)
+        return (node, edge)
+    return ((0, 0), (1, 1)) if len(v) == len(w) == 1 else tuple(
+        tuple(reversed(_))
+        for _ in get_edge(w, v, sigma, score_dict)
+    ) if len(v) <= 2 and len(w) > 1 else get_edge(v, w, sigma, score_dict)
 
 
 class LinearSpaceAlignment(object):
