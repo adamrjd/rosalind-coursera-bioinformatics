@@ -6,8 +6,7 @@ namespace Coursera
 {
     public class LinearSpaceAlignment
     {
-        /*Translation from python3 b/c py was too slow for 500+ peptide sequences,
-        but then I realized both have a bug somewhere ):*/
+        /*Translation from cpy35 b/c py is too slow for large sequences!!!*/
         string v;
         string w;
         public string v_aligned;
@@ -23,139 +22,140 @@ namespace Coursera
             this.score_dict = score_dict;
 
         }
-        int[,] LinearScoring(string v, string w)
+        Tuple<Dictionary<Tuple<int, int>, int>, int[]> LinearScoring(string v, string w)
         {
-            int[,] s = new int[w.Length + 1, 2];
-            for (int x = 0; x < v.Length + 1; x++)
+            /*score sequences and only preserve a certain number of rows in scoring matrix*/
+
+            // instantiate and initialize matrices
+            Dictionary<Tuple<int, int>, int> s = Enumerable.Range(0, v.Length + 1)
+                                        .ToDictionary(x => new Tuple<int, int>(x, 0), x => -this.sigma * x);
+            int[] backtrack = Enumerable.Range(0, v.Length + 1)
+                                        .Select(x => 1)
+                                        .ToArray();
+
+            // fill matrices
+            for (int y = 1; y < w.Length + 1; y++)
             {
-                for (int y = 0; y < w.Length + 1; y++)
+                for (int x = 0; x < v.Length + 1; x++)
                 {
-                    if (y == 0 || x == 0) { s[y, 0] = -this.sigma * y; s[y, 1] = -this.sigma * x; }
+                    if (x == 0) s.Add(new Tuple<int, int>(x, y), -this.sigma * y);
 
                     else
                     {
-
-                        int score;
-                        if (v[x - 1] == w[y - 1]) score = s[y - 1, 0] + this.score_dict[v[x - 1]][w[y - 1]];
-                        else score = new int[2] { s[y, 0], s[y - 1, 1] }.Max();
-
-                        s[y, 0] = s[y, 1];
-                        s[y, 1] = score;
+                        List<int> scores = new List<int> {
+                            s[new Tuple<int, int>(x - 1, y - 1)]
+                            + this.score_dict[
+                                v.Substring(x - 1, 1)[0]][
+                                    w.Substring(y - 1, 1)[0]], //diagonal
+                            s[new Tuple<int, int>(x, y - 1)] - this.sigma, //right
+                            s[new Tuple<int, int>(x - 1, y)] - this.sigma //down
+                        };
+                        int score = scores.Max();
+                        s.Add(new Tuple<int, int>(x, y), score);
+                        backtrack[x] = scores.IndexOf(score);
                     }
+
+                    if (y - 2 >= 0 && v.Length > 2) s.Remove(new Tuple<int, int>(x, y - 2));
                 }
             }
-            return s;
+            return new Tuple<Dictionary<Tuple<int, int>, int>, int[]>(s, backtrack);
         }
-        public int[,] MiddleEdge(string v, string w)
+        List<int[]> getEdge(string v, string w)
         {
-            if (w.Length <= 1) return null;
-            var c = v;
-            v = w;
-            w = c;
-            int icol = (int)Math.Floor((double)(v.Length) / 2);
+            int jcol = (int)Math.Floor((double)(w.Length) / 2);
 
-            int[,] s = this.LinearScoring(v.Substring(0, icol), w);
-            int[,] r_s = this.LinearScoring(
-                            string.Join("", v.Substring(icol, v.Length - icol).Reverse()),
-                            string.Join("", w.Reverse()));
+            Dictionary<Tuple<int, int>, int> s = this.LinearScoring(
+                            v,
+                            w.Substring(0, jcol)).Item1;
+            var reversed_s = this.LinearScoring(
+                            string.Join("", v.Reverse()),
+                            string.Join("", w.Substring(jcol, w.Length - jcol).Reverse()));
+            Dictionary<Tuple<int, int>, int> r_s = reversed_s.Item1;
+            int[] backtrack = reversed_s.Item2;
 
-            int[,] edge = new int[2, 2];
+            int[] node = new int[2];
             int max_score = -int.MaxValue;
 
-            for (int y = 0; y < icol; y++)
+            for (int x = 0; x < (int)Math.Floor((decimal)v.Length / 2) + 1; x++)
             {
-                int node = s[y, 1] + r_s[w.Length - 1 - y, 0];
-                if (node > max_score)
+                int score = s[new Tuple<int, int>(x, jcol)] + r_s[new Tuple<int, int>(v.Length - x, jcol)];
+                if (score > max_score)
                 {
-                    edge[0, 0] = y; edge[0, 1] = icol;
-                    max_score = node;
+                    node[0] = x;
+                    node[1] = jcol;
+                    max_score = score;
                 }
             }
 
-            // if score minimized on diagonal, get diagonal..else get right
-            if (r_s[w.Length - 1 - edge[0, 0], 1] < s[edge[0, 0], 1] + r_s[w.Length - 1 - edge[0, 0], 0])
-            {
-                edge[1, 0] = edge[0, 0] + 1; edge[1, 1] = edge[0, 1] + 1;
-            }
+            int dir = backtrack[v.Length - node[0]];
+            int[] edge;
+
+            if (dir == 0) edge = new int[2] { node[0] + 1, node[1] + 1 };
+            else if (dir == 1) edge = new int[2] { node[0] + 1, node[1] };
+            else edge = new int[2] { node[0], node[1] + 1 };
+
+            return new List<int[]> { node, edge };
+        }
+        public List<int[]> MiddleEdge(string v, string w)
+        {
+            if (v.Length == 1 && w.Length == 1)
+                return new List<int[]> { new int[2] { 0, 0 }, new int[2] { 1, 1 } };
+            else if (v.Length <= 2 && w.Length > 1)
+                return getEdge(
+                    w, v)
+                    .Select(p => p.Reverse().ToArray())
+                    .ToList();
             else
-            {
-                edge[1, 0] = edge[0, 0] + 1; edge[1, 1] = edge[0, 1];
-            }
-
-            return edge;
+                return getEdge(v, w);
         }
-        public string[] nonlinear_global_align(string v, string w)
+        string[] recurse(int left, int right, int top, int bottom)
         {
-            int i = v.Length;
-            int j = w.Length;
-            int[,] s = new int[i + 1, j + 1];
-            int[,] backtrack = new int[i + 1, j + 1];
-
-            for (int x = 1; x < i + 1; x++)
-            {
-                for (int y = 1; y < j + 1; y++)
-                {
-                    int[] l = new int[3] {
-                            s[x - 1, y] - this.sigma,
-                            s[x, y - 1] - this.sigma,
-                            s[x - 1, y - 1] + this.score_dict[v[x - 1]][w[y - 1]]
-                        };
-                    s[x, y] = l.Max();
-                    backtrack[x, y] = l.ToList().FindIndex(0, 1, elem => elem == s[x, y]);
-                }
-            }
-
-            this.score = s[i, j];
-            while (i * j != 0)
-            {
-                if (backtrack[i, j] == 0)
-                {
-                    i -= 1;
-                    w = w.Insert(j, "-");
-                }
-                else if (backtrack[i, j] == 1)
-                {
-                    j -= 1;
-                    v = v.Insert(i, "-");
-                }
-                else
-                {
-                    i -= 1;
-                    j -= 1;
-                }
-            }
-            for (int _ = 0; _ < i; _++) w = w.Insert(0, "-");
-            for (int _ = 0; _ < j; _++) v = v.Insert(0, "-");
-            return new string[2] { v, w };
-        }
-        string[] recurse(int top, int bottom, int left, int right)
-        {
-            if (left == right) return new string[2] {
-                this.v.Substring(top, bottom - top),
+            if (top == bottom)
+                return new string[2] {
+                this.v.Substring(left, right - left),
                 "".PadRight(right - left, '-')
             };
-            else if (top == bottom) return new string[2] {
-                "".PadRight(right - left, '-'),
-                this.w.Substring(left, right - left)
+            else if (left == right)
+                return new string[2] {
+                "".PadRight(bottom - top, '-'),
+                this.w.Substring(top, bottom - top)
             };
-            else if (bottom - top == 1 || right - left == 1) return this.nonlinear_global_align(
-                this.v.Substring(top, bottom - top),
-                this.w.Substring(left, right - left)
-            );
+
             else
             {
-                int[,] middle_edge = this.MiddleEdge(this.v.Substring(top, bottom - top), this.w.Substring(left, right - left));
-                int[] middle_node = new int[2] { middle_edge[0, 0] + top, middle_edge[0, 1] + left };
-                int[] next_node = new int[2] { middle_edge[1, 0] + top, middle_edge[1, 1] + left };
+                List<int[]> middle_edge = this.MiddleEdge(
+                    this.v.Substring(left, right - left),
+                    this.w.Substring(top, bottom - top));
+                int[] node = new int[2] {
+                    middle_edge[0][0] + left,
+                    middle_edge[0][1] + top };
+                int[] edge = new int[2] {
+                    middle_edge[1][0] + left,
+                    middle_edge[1][1] + top };
 
-                string[] current = new string[2] {
-                        new string[2] {"-", this.v.Substring(middle_node[0] % this.v.Length, 1)} [ next_node[0] - middle_node[0] ],
-                        new string[2] {"-", this.w.Substring(middle_node[1] % this.w.Length, 1)} [ next_node[1] - middle_node[1] ]
+                string[] subalignment = new string[2] {
+                        new string[2] {"-", this.v.Substring(node[0], 1)} [ edge[1] - node[1] ],
+                        new string[2] {"-", this.w.Substring(node[1], 1)} [ edge[0] - node[0] ]
                         };
 
-                string[] A = recurse(top, middle_node[0], left, middle_node[1]);
-                string[] B = recurse(next_node[0], bottom, next_node[1], right);
-                return new string[2] { A[0] + current[0] + B[0], A[1] + current[1] + B[1] };
+                // lefthand side of divide and conquer recursive traversal
+                string[] A = recurse(left, node[0], top, node[1]);
+
+                // shift edge with current subalignment if there is an indel
+                if (subalignment.Contains("-"))
+                {
+                    for (int i = 0; i < 2; i++)
+                    {
+                        if (subalignment[i].Contains("-")) edge[i] -= 1;
+                        else edge[i] += 1;
+                    }
+                }
+
+                // righthand side of divide and conquer recursive traversal
+                string[] B = recurse(edge[0], right, edge[1], bottom);
+
+                // returns results at node in relative recursive frame
+                return new string[2] { A[0] + subalignment[0] + B[0], A[1] + subalignment[1] + B[1] };
             }
         }
         public void GlobalAlignment()

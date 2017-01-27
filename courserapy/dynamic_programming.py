@@ -156,82 +156,78 @@ def affine_gap_alignment(sigma, epsilon, score_dict, v, w):
 
 
 def multiple_sequence_alignment(v, w, u):
+    from math import ceil
     l, m, n = [len(_) for _ in (v, w, u)]
     align_score = 0
     # lambdas
-    scores_ijk = lambda i, j, k: [[
-        s[i][j][k - 1],
-        s[i][j - 1][k],
-        s[i - 1][j][k],
-        s[i][j - 1][k - 1],
-        s[i - 1][j][k - 1],
-        s[i - 1][j - 1][k],
-        s[i - 1][j - 1][k - 1] + 1 if v[k - 1] == w[j - 1] == u[i - 1] else 0]]
     indel = lambda seq, p: seq[:p] + '-' + seq[p:]
 
-    # initialize scoring matrix
-    s = [[[0 for _ in range(l + 1)] for __ in range(m + 1)]
-         for ___ in range(n + 1)]
-    backtrack = [[[0 for _ in range(l + 1)]
-                  for __ in range(m + 1)] for ___ in range(n + 1)]
+    # initialize matrices
+    s = [[[0 for _ in range(n + 1)] for __ in range(m + 1)]
+         for ___ in range(l + 1)]
+    backtrack = [[[0 for _ in range(n + 1)]
+                  for __ in range(m + 1)] for ___ in range(l + 1)]
     for x in range(1, l + 1):
         for y in range(1, m + 1):
             for z in range(1, n + 1):
-                scores = scores_ijk(z, y, x)
-                s[z][y][x] = max(scores)
-                backtrack[z][y][x] = scores.index(s[z][y][x])
-    align_score = s[n][m][l]
+                scores = [
+                    s[x - 1][y - 1][z - 1] +
+                    int(v[x - 1] == w[y - 1] == u[z - 1]),
+                    s[x][y - 1][z - 1],
+                    s[x - 1][y][z - 1],
+                    s[x - 1][y - 1][z],
+                    s[x][y][z - 1],
+                    s[x][y - 1][z],
+                    s[x - 1][y][z],
+                ]
+                s[x][y][z] = max(scores)
+                backtrack[x][y][z] = scores.index(s[x][y][z])
+    align_score = ceil(s[l][m][n])
 
     # backtracking
     while l * m * n != 0:
-        dex = backtrack[n][m][l]
-        if dex == 2:
+        trace = backtrack[l][m][n]
+        if trace == 6:
+            l -= 1
             w = indel(w, m)
             u = indel(u, n)
-            l -= 1
-        elif dex == 1:
+        elif trace == 5:
             v = indel(v, l)
-            u = indel(u, n)
             m -= 1
-        elif dex == 0:
+            u = indel(u, n)
+        elif trace == 4:
             v = indel(v, l)
             w = indel(w, m)
             n -= 1
-        elif dex == 5:
-            u = indel(u, n)
+        elif trace == 3:
             l -= 1
             m -= 1
-        elif dex == 4:
-            w = indel(w, m)
+            u = indel(u, n)
+        elif trace == 2:
             l -= 1
+            w = indel(w, m)
             n -= 1
-        elif dex == 3:
+        elif trace == 1:
             v = indel(v, l)
             m -= 1
             n -= 1
-        elif dex == 6:
+        elif trace == 0:
             l -= 1
             m -= 1
             n -= 1
-    # backtrack to 0
+
+    # finish insertions for all 3 strings if necessary
     for _ in range(l):
         v = indel(v, 0)
     for _ in range(m):
         w = indel(w, 0)
     for _ in range(n):
-        u = indel(u, 0)
+        u = indel
 
     return align_score, v, w, u
 
 
 if __name__ == "__main__":
     from dataimport import Score
-    print(global_alignment(5, Score().BLOSUM62, 'N', 'L'))
-    '''from dataimport import Score
-    with open('input.txt', 'r') as f:
-        str2, str1 = [line.strip() for line in f.readlines()]
-    penalty = 5
-    score_matrix = Score().BLOSUM62
-    with open('output.txt', 'w') as f:
-        for _ in global_alignment(penalty, score_matrix, str1, str2):
-            f.write(str(_) + '\n')'''
+    print(global_alignment(5, Score().BLOSUM62,
+                           '', ''))

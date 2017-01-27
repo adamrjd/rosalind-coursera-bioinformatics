@@ -10,7 +10,8 @@ class Graph(object):
     from utils import nested_dict
     adjlist = nested_dict()
     leaves = list()
-    matrix = None  # sometimes consuming matrix not graph
+    matrix = None
+    phylogeny = None
 
     def __init__(self, data, graph_type="weighted_graph"):
         if graph_type == "weighted_graph":
@@ -29,11 +30,9 @@ class Graph(object):
             self.matrix = [[int(x) for x in row.split(" ")] for row in data]
             for i, row in enumerate(data):
                 for j, weight in enumerate(row.split(" ")):
-                    if i != j:
-                        self.adjlist[int(i)] = {int(j): int(weight)}
-        elif graph_type == "genome":
-            # data = list("+1","-2",...,"+4")
-            pass
+                    self.adjlist[int(i)][int(j)] = int(weight)
+            for _ in range(len(self.adjlist.keys())):
+                self.leaves.append(_)
 
     def adjlist_dict_to_strlist(self):
         if len(self.adjlist.keys()) != 0:
@@ -50,7 +49,7 @@ class Graph(object):
     def distance_between_leaves(self, n):
         def Dijkstra(source, sink):
             nodes = list(self.adjlist.keys())
-            dist_dict = {v: float('inf') for v in self.adjlist.keys()}
+            dist_dict = {v: float('inf') for v in nodes}
             dist_dict[source] = 0
             prev_node = dict()
             while len(nodes) > 0:
@@ -82,39 +81,51 @@ class Graph(object):
                         limb_list.append(((d(i, j) + d(j, k) - d(i, k)) / 2))
         return int(min(limb_list))
 
-    def additive_phylogeny(self, n, matrix):
-        dist_theorem = lambda m, i, j, k: (m[i][j] + m[j][k] - m[i][k]) / 2
-        limb_length = lambda n, m: int(min([dist_theorem(m, i, n - 1, k)
-                                            for i in range(n)
-                                            for k in range(n)
-                                            if i != k and k != n - 1 and i != n - 1]))
-        node = n + 1
-        adj_lst = None
-        for i in range(n - 2):
-            j = i + 1
-            k = j + 1
-            curr_adj_lst = dict()
-            curr_adj_lst[i] = {node: dist_theorem(matrix, i, j, k)}
-            curr_adj_lst[j] = {node: dist_theorem(matrix, j, k, i)}
-            curr_adj_lst[k] = {node: dist_theorem(matrix, k, i, j)}
-            curr_adj_lst[node] = {_: curr_adj_lst[_] for _ in (i, j, k)}
-            if adj_lst != None:
-                p_node = node - 1
-                edges = adj_lst.pop(p_node)
-                # want to call limb length for new limb...then insert into old
-                # adjlist
-            else:
-                adj_lst = dict()
-                for item in curr_adj_lst:
-                    adj_lst.update(item)
-            node += 1
-        self.adjlist = adj_lst
-        return self.adjlist
+    def additive_phylogeny(self, curr_adjlist=None, edges=None, length=None):
+        from copy import deepcopy
+        dist_theorem = lambda i, j, k: (
+            self.adjlist[i][j] + self.adjlist[j][k] - self.adjlist[i][k]) / 2
+        limb_length = lambda node: int(min([dist_theorem(i, node, k)
+                                            for i in range(len(self.leaves))
+                                            for k in range(len(self.leaves))
+                                            if i != node != k]))
+
+        if curr_adjlist is None:
+            curr_adjlist = deepcopy(self.adjlist)
+
+        # add base case...
+        if len(curr_adjlist.keys()) > 2:
+            node = min(curr_adjlist.keys())
+            length = limb_length(node)
+            # bald tree
+            for _ in curr_adjlist.keys():
+                curr_adjlist[node][_] -= length
+                if _ != node:
+                    curr_adjlist[_][node] -= length
+            # trim tree
+            edges = curr_adjlist.pop(node)
+            for _ in curr_adjlist.keys():
+                curr_adjlist[_].pop(node)
+            # recurse
+            self.additive_phylogeny(curr_adjlist, edges, length)
+
+        # add things back to tree
+        if self.phylogeny is not None:
+            # recover results from last recursion
+            curr_adjlist = self.phylogeny
+
+        for node in curr_adjlist:
+
+        self.phylogeny = deepcopy(curr_adjlist)
+        return
+
 if __name__ == "__main__":
     matrix_print = lambda m: [
         print('\t'.join([str(_) for _ in row])) for row in m]
-    with open('text.txt', 'r') as f:
+    with open('input.txt', 'r') as f:
         N, *INPUT_DATA = [l.strip() for l in f.readlines()]
     N = int(N)
     M = Graph(INPUT_DATA, "distance_matrix")
-    matrix_print(M.additive_phylogeny(N, M.matrix))
+    M.additive_phylogeny()
+    for _ in M.adjlist_dict_to_strlist():
+        print(_)
