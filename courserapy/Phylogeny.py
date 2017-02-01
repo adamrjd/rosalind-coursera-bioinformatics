@@ -142,7 +142,7 @@ class Graph(object):
             __ += T[0][_]
             if __ > x:
                 # insert node here
-                sfdfd
+                pass
         # self.leaves.append(max(self.leaves) + 1)
 
                 # return new adjlist
