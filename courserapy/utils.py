@@ -61,7 +61,7 @@ class Tree(object):
             self.left = Tree()
             self.right = Tree()
             for e in elem:
-                self.insert(elem)
+                self.insert(e)
         else:
             if elem is not None:
                 self.root = elem

@@ -2,8 +2,12 @@ from os import getcwd
 CWD = getcwd()
 DATDIR = '/datfiles/'
 
+with open(CWD + DATDIR + 'codons.txt', 'r') as inputdata:
+    codons = {item[0]: item[1] for item in [line.strip().split(" ")
+                                            for line in inputdata.readlines()]}
 
-class masstable(object):
+
+class MassTable(object):
     '''Canned lists and methods for amino acid masses in peptide sequencing problems'''
 
     masses = list()

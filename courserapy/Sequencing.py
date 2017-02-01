@@ -1,7 +1,113 @@
-'''really need to refactor this code; could do way better'''
+from Parsing import MassTable, codons
+from os import getcwd
 
-from scripts import *
-nuc = {nucleotide: index for index, nucleotide in enumerate('ACGT')}
+lookup = MassTable()
+rbase = 'ACGU'
+base = 'ACGT'
+
+global lookup
+global rbase
+global base
+
+# ... SCRIPTS ......................................................
+# Manipulating graphs
+
+
+def circularize(element):
+    if len(element) == 1:
+        return element
+    else:
+        return [element[i:] + element[:i] for i in range(0, len(element))]
+
+
+def decircularize(peptides):
+    peptides = sorted(peptides)
+    for i in range(0, len(peptides) / len(peptides[0])):
+        cyclopeptide = peptides[i]
+        removable = circularize(cyclopeptide)
+        [peptides.remove(pep) for pep in removable
+         if pep != cyclopeptide and pep in peptides]
+    return peptides
+
+
+def assemble(paths):
+    reads = []
+    for path in paths:
+        read = path[0] + "".join([kmer[len(kmer) - 1:] for kmer in path[1:]])
+        reads.append(read)
+    return reads
+
+# DNA manipulation numerically
+
+
+def skew(dna):
+    s = [0]
+    skew_dict = {'G': 1, 'C': -1, 'A': 0, 'T': 0}
+    for i, let in enumerate(dna):
+        s.append(s[i] + skew_dict[let])
+    return s
+
+
+def hammingdistance(p, q):
+    if len(p) != len(q):
+        return 0
+    else:
+        return sum([1 for i in range(len(p)) if p[i] != q[i]])
+
+
+def numbertopattern(num, k):
+    return "".join(
+        [numnuc[int(num / 4**(k - i)) % 4] for i in range(1, k + 1)])
+
+
+def patterntonumber(path):
+    l = len(path)
+    return sum([nucnum[path[i]] * 4**(l - i - 1) for i in range(0, l)])
+
+# RNA scripts
+
+
+def reversecomplement(dna):
+    return "".join([pairs[letter] for i, letter in enumerate(dna[::-1])])
+
+
+def reversecomplementrna(rna):
+    return "".join([rpairs[letter] for i, letter in enumerate(rna[::-1])])
+
+
+def translate(rna):
+    return "".join([codons[rna[i:i + 3]] for i in range(0, len(rna) - 2, 3)
+                    if codons[rna[i:i + 3]] != '#'])
+
+
+def transcribe(dna):
+    return "".join([dnarna[let] for let in dna])
+
+
+def reversetranscribe(rna):
+    return "".join([dnarna[let] for let in rna])
+
+
+def shared_kmers(k, dna1, dna2):
+    kmers_dict = dict()
+    shared_kmers_lst = list()
+    enumerate_dna = lambda dna: enumerate(
+        [dna[_:_ + k] for _ in range(len(dna) - k + 1)])
+    for i, kmer in enumerate_dna(dna1):
+        if kmer in kmers_dict:
+            kmers_dict[kmer].append(i)
+        else:
+            kmers_dict[kmer] = list([i])
+    for j, kmer in enumerate_dna(dna2):
+        if kmer in kmers_dict:
+            for x in kmers_dict[kmer]:
+                shared_kmers_lst.append((x, j))
+        elif reversecomplement(kmer) in kmers_dict:
+            for x in kmers_dict[reversecomplement(kmer)]:
+                shared_kmers_lst.append((x, j))
+    return list(sorted(shared_kmers_lst, key=lambda l: l[1]))
+
+# ... ROSALIND SOLUTIONS ....................................
 
 
 def neighbors(Pattern, d):
@@ -147,10 +253,10 @@ def profile(Dna):
     return dumby
 
 
-def consensus(k, profile):
+def consensus(k, pr):
     motif = ""
     for i in range(0, k):
-        column = [profile[base][i] for base, nucleotide in enumerate(nuc)]
+        column = [pr[base][i] for base, nucleotide in enumerate(nuc)]
         motif += sorted(list(nuc))[column.index(max(column))]
     return motif
 
@@ -172,15 +278,16 @@ def GreedyMotifSearch(Dna, k, t):
 
 
 def RandomizedMotifSearch(Dna, k, t, i):
+    from random import randint
     count = 0
     bestmotifs = [""] * t
     for j in range(0, t):
-        r = random.randint(0, len(Dna[0]) - k)
+        r = randint(0, len(Dna[0]) - k)
         bestmotifs[j] = Dna[j][r:r + k]
     while count <= i:
         motifs = [""] * t
         for j in range(0, t):
-            r = random.randint(0, len(Dna[0]) - k)
+            r = randint(0, len(Dna[0]) - k)
             motifs[j] = Dna[j][r:r + k]
         while True:
             profile_lst = profile(motifs)
@@ -197,15 +304,16 @@ def RandomizedMotifSearch(Dna, k, t, i):
 
 
 def GibbsSampler(dna, k, t, N):
+    from random import randint, randrange
     motifs = [dna[i][r:r + k]
-              for i, r in enumerate([random.randint(0, len(dna[0]) - k)
+              for i, r in enumerate([randint(0, len(dna[0]) - k)
                                      for a in range(t)])]
     bestmotifs = motifs
     for j in range(0, N):
-        i = random.randrange(t)
-        profile = profile(motifs[:i] + motifs[i + 1:])
-        motifs[i] = most_probable_profile(dna[i], profile, k)
-        if Score(motifs) < Score(bestmotifs):
+        i = randrange(t)
+        pr = profile(motifs[:i] + motifs[i + 1:])
+        motifs[i] = most_probable_profile(dna[i], pr, k)
+        if score(motifs) < score(bestmotifs):
             bestmotifs = motifs
 
     return bestmotifs
@@ -252,9 +360,10 @@ def deBruijnGraph(path, k):
 
 
 def cycle(node, graph):
+    from random import randint
     cycle = [node]
     while True:
-        cycle.append(graph[node].pop(random.randint(0, len(graph[node]) - 1)))
+        cycle.append(graph[node].pop(randint(0, len(graph[node]) - 1)))
         if len(graph[node]) == 0:
             del graph[node]
         if cycle[-1] in graph:
@@ -265,7 +374,8 @@ def cycle(node, graph):
 
 
 def EulerianCycle(graph):
-    node = graph.keys()[random.randint(0, len(graph) - 1)]
+    from random import randint
+    node = graph.keys()[randint(0, len(graph) - 1)]
     circuit, graph = cycle(node, graph)
     path = circuit
     while len(graph) > 0:
@@ -280,7 +390,7 @@ def EulerianCycle(graph):
 def EulerianPath(graph):
     node = ""
     nodes = graph.keys()
-    edges = flatten(graph.values())
+    edges = [ll for l in graph.values() for ll in l]
     for n in nodes:
         if edges.count(n) < len(graph[n]):
             node = n
@@ -321,10 +431,11 @@ def StringSpelledByGappedPatterns(pairs, k, d):
 
 
 def Contigs(kmers):
+    from copy import deepcopy
     graph = OverlapGraph(kmers)
-    dumby = OverlapGraph(kmers)
-    nodes = flatten([[key for dumby[key] in dumby[key]] for key in dumby])
-    edges = flatten(graph.values())
+    nodes = [ll for l in [list(_[k]) for k in _ for _ in list(
+        deepcopy(graph))] for ll in l]
+    edges = [ll for l in graph.values() for ll in l]
     breaks = []
     for node in nodes:
         if len(graph[node]) != 1 or nodes.count(node) != edges.count(node):
@@ -356,8 +467,138 @@ def kUniversalBinaryString(k):
     kmers = [num[2:] for num in strings]
     return EulerianPath(OverlapGraph(kmers))
 
+
+def fragment(peptide, cyclic=False):
+    fragments = []
+    if cyclic == True:
+        for string in [peptide[i:] + peptide[:i] for i in range(len(peptide))]:
+            [fragments.append(string[0:j]) for j in range(1, len(peptide))]
+        fragments.append(peptide)
+    else:
+        for i in range(len(peptide)):
+            [fragments.append(peptide[i:i + j])
+             for j in range(1, len(peptide) - i + 1)]
+    return fragments
+
+
+def theoreticalspectrum(peptide, cyclic=False):
+    theory = [0]
+    fragments = fragment(peptide, cyclic)
+    [theory.append(sum([lookup.get_mass(ch) for ch in frag]))
+     for frag in fragments]
+    return sorted(theory)
+
+
+def encoding_peptides(dna, peptide):
+    rna = transcribe(dna)
+    k = len(peptide) * 3
+    rng = range(0, (len(dna) - k + (1 * len(peptide))) * 2)
+    cond = lambda s: bool(translate(s) == peptide or translate(
+        reversecomplementrna(s)) == peptide)
+    return [reversetranscribe(rstrand)
+            for rstrand in ["".join(rna)[i:i + k] for i in rng] if cond(rstrand)]
+
+
+def peptide_sequencing(spectrum, cyclic=False):
+    from itertools import permutations
+    aminoacids = list(m for m in spectrum if m in lookup.acids)
+    length = len(aminoacids)
+    peptides = permutations(aminoacids)
+    return [[lookup.get_mass(pep) for pep in peptide] for peptide in peptides if theoreticalspectrum(peptide, cyclic) == spectrum]
+
+
+def spectrum_score(peptide, spectrum, cyclic=False):
+    theoretical = theoreticalspectrum(peptide, cyclic)
+    if spectrum[-1] < theoretical[-1]:
+        return -1
+    else:
+        return sum([min(theoretical.count(protein), spectrum.count(protein))
+                    for protein in set(spectrum)])
+
+
+# need to translate this to just using masses
+def leaderboard_sequencing(spectrum, N, cyclic=False):
+    acids_masses = lookup.masses
+    peptides = dict()
+    best_seqs = list([0, set()])
+    for a in acids_masses:
+        score = spectrum_score(a, spectrum, cyclic)
+        if score in peptides:
+            peptides[score].add(a)
+        else:
+            peptides[score] = {a}
+    while len(peptides) > 0:
+        growths = dict()
+        for vals in peptides.values():
+            for seq in vals:
+                for a in aa:
+                    growth = seq + a
+                    if mass(growth) in spectrum:
+                        score = spectrum_score(growth, spectrum, cyclic)
+                        if score != -1:
+                            if score in growths:
+                                growths[score].add(growth)
+                            else:
+                                growths[score] = {growth}
+
+        if len(growths.keys()) > 0:
+            peptides = growths
+            max_score = max(peptides.keys())
+        else:
+            break
+
+        if max_score >= best_seqs[0]:
+            best_seqs[0] = max_score
+            best_seqs[1] = peptides[max_score]
+        total = sum([len(l) for l in peptides.values()])
+        if sum([len(l) for l in peptides.values()]) > N:
+            min_score = min(peptides.keys())
+            while total > N:
+                if len(peptides[min_score]) != 0:
+                    peptides[min_score].pop()
+                    total -= 1
+                else:
+                    del peptides[min_score]
+                    min_score = min(peptides.keys())
+    return '-'.join([str(acidsmasses[ch]) for ch in best_seqs[1].pop()])
+
+
+def spectral_convolution_with_multiplicities(spectrum):
+    convolution = dict()
+    for i, peak in enumerate(spectrum):
+        for mass in spectrum[:i]:
+            diff = peak - mass
+            if diff >= 57 and diff <= 200:
+                if diff in convolution:
+                    convolution[diff] += 1
+                else:
+                    convolution[diff] = 1
+    return convolution
+
+
+def spectral_convolution(spectrum):
+    return list(
+        filter(lambda x: x != None,
+               [peak - mass if peak - mass > 0 else None
+                for mass in spectrum[:i]
+                for i, peak in enumerate(spectrum)])
+    )
+
+
+def convolution_cyclopeptide_sequencing(M, N, spectrum):
+    convolution = spectral_convolution_with_multiplicities(spectrum)
+    multiplicities = list()
+    total = 0
+    temp = sorted(convolution.values(), reversed=True)
+    for i, multiplicity in enumerate(temp):
+        total += multiplicity
+        if total > M:
+            multiplicities = set(temp[:i])
+            break
+    leaderboard_spectrum = leaderboard_sequencing(
+        [k for k in convolution if convolution[k] in multiplicities], N, True)
+
+
 if __name__ == "__main__":
-    with open('text.txt', 'r') as f:
-        read_data = [l.strip('\n()') for l in f.readlines()]
-    pairs = [_.split('|') for _ in read_data]
-    print(StringSpelledByGappedPatterns(pairs, 3, 1))
+    print(convolution_cyclopeptide_sequencing(20, 60, [int(
+        x) for x in '57 57 71 99 129 137 170 186 194 208 228 265 285 299 307 323 356 364 394 422 493'.split(' ')]))
