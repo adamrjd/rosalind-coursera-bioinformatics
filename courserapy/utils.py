@@ -7,12 +7,6 @@ Recipes I like or made
 class Utils(object):
 
     @staticmethod
-    def zip2(iterable):
-        '''s -> (s0, s1), (s2, s3), (s4, s5), ...'''
-        a = iter(iterable)  # this way a forces skip to next elem in zip
-        return zip(a, a)
-
-    @staticmethod
     def groupN(iterable, n):
         '''s -> (s0,s1,s2,..., sn-1), (sn, sn+1, sn+2,...,s2n-1), ...'''
         return zip(*[iter(iterable)] * n)
@@ -181,7 +175,4 @@ class Tree(object):
 
 
 if __name__ == '__main__':
-
-    t = Tree(range(1000))
-    for item in t:
-        print(item)
+    pass
