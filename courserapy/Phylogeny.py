@@ -139,13 +139,18 @@ class Graph(object):
         # create new limb
         __ = 0
         for _ in range(v):
-            __ += T[0][_]
+            __ += T.adjlist[0][_]
             if __ > x:
-                # insert node here
-                pass
+                # insert node
+                (T.adjlist[_][v],
+                 T.adjlist[v][_],
+                 T.adjlist[v][v]) = length, length, 0
+                for node in list(i for i in range(v - 1) if i != _):
+                    dist = int(dist_theorem(v, node, _))
+                    T.adjlist[v][node] = dist
         # self.leaves.append(max(self.leaves) + 1)
 
-                # return new adjlist
+        # return new adjlist
         self.phylogeny = T
         return T
 

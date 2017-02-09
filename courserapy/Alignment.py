@@ -19,7 +19,7 @@ class DynamicAlignment(object):
 
     @classmethod
     def scoring(cls, v, w, sigma, score_dict, local=False):
-        i, j = [len(_) for _ in [v, w]]
+        i, j = len(v), len(w)
         if local:
             max_pos = (0, [0, 0])
         score = lambda x, y: score_dict[v[x - 1]][w[y - 1]]
@@ -39,8 +39,7 @@ class DynamicAlignment(object):
                 s[x][y], backtrack[x][y] = max(l), l.index(max(l))
                 if local:
                     if s[x][y] > max_pos[0]:
-                        max_pos[0] = s[x][y]
-                        max_pos[1] = [x, y]
+                        max_pos = (s[x][y], [x, y])
 
         if local:
             return s, backtrack, max_pos
@@ -69,14 +68,13 @@ class DynamicAlignment(object):
             v = indel(v, 0)
         return score, v, w
 
-    '''def local_alignment(sigma, score_dict, v, w):
-        # this is broken
+    @classmethod
+    def local_alignment(cls, v, w, sigma, score_dict):
         i, j = [len(v), len(w)]
-        a = [0, v, w]
-        s, backtrack, max_pos = scoring(sigma, score_dict, v, w, True)
-        a[0] = max_pos[0]
-        i, j, a[1], a[2] = align(backtrack, v, w, max_pos[1])
-        return a'''
+        score = 0
+        s, backtrack, (score, source) = DynamicAlignment.scoring(
+            v, w, sigma, score_dict, True)
+        return source
 
     @classmethod
     def edit_distance(cls, v, w, sigma, score_dict):
@@ -520,11 +518,13 @@ def two_break(p, q):
     return blocks(q) - breakpoint_count(p)
 
 if __name__ == "__main__":
-    with open('input.txt', 'r') as f:
+    print(DynamicAlignment.local_alignment(
+        'MEANLY', 'PENALTY', 5, Score().PAM250))
+    '''with open('input.txt', 'r') as f:
         str1, str2 = [line.strip() for line in f.readlines()]
     penalty = 5
     score_matrix = Score().BLOSUM62
     with open('output.txt', 'w') as f:
         for _ in LinearAlignment(
                 str1, str2, penalty, score_matrix).global_align():
-            f.write(str(_) + '\n')
+            f.write(str(_) + '\n')'''

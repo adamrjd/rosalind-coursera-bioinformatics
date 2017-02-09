@@ -1,3 +1,5 @@
+# Written in Py35
+# for Stepik course "Adaptive Python"
 
 '''
 def main():

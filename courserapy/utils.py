@@ -4,44 +4,73 @@ Clever utilities, borrowed or self-wrote
 '''
 
 
-def nested_dict():
-    '''
-    Borrowed from user:andrew on StackOverflow
-    Creates a defaultdict of arbitrary depth
+class Utils(object):
 
-    nice b/c it's a functional way of creating arbitrary depth
-    '''
-    from collections import defaultdict
-    return defaultdict(nested_dict)
+    @classmethod
+    def test(cls, func, args=None, kwargs=None):
+        '''
+        canned test for profiling code
+        iz naizz 4 large input tests
+        '''
+        import cProfile
+        import pstats
+        import io
 
+        pr = cProfile.Profile()
+        pr.enable()
+        # no idea what this does...maybe CPU time in compiled C code...
+        if args is not None and kwargs is not None:
+            pr.runcall(func, *args, **kwargs)
+        elif args is not None:
+            pr.runcall(func, *args)
+        else:
+            pr.run(func)
+        pr.disable()
 
-def get_size(obj, seen=None):
-    '''
-    Borrowed from user:wissam on StackOverflow
-    Returns the size of a Python object in memory
+        s = io.StringIO()
+        ps = pstats.Stats(pr, stream=s).sort_stats('cumulative')
+        ps.print_stats()
+        print(s.getvalue())
 
-    nice b/c getsizeof doesn't account for size of underlying items
-    '''
-    from sys import getsizeof
-    size = getsizeof(obj)
-    if seen is None:
-        seen = set()
-    obj_hash = id(obj)
-    if obj_hash in seen:
-        return 0
-    seen.add(obj_hash)
+    @classmethod
+    def instance_size(cls, obj, seen=None):
+        '''
+        Borrowed from user:wissam on StackOverflow
+        Returns the size of a Python object in memory
 
-    # recurse
-    if isinstance(obj, dict):
-        size += sum([get_size(_, seen)
-                     for _ in list(obj.keys()) + list(obj.values())])
-    elif hasattr(obj, '__dict__'):
-        size += get_size(obj.__dict__, seen)
-    elif hasattr(obj, '__iter__') and not isinstance(obj, (str, bytes, bytearray)):
-        size += sum([get_size(i, seen) for i in obj])
+        nice b/c getsizeof doesn't account for size of underlying items
+        '''
+        from sys import getsizeof
+        size = getsizeof(obj)
+        if seen is None:
+            seen = set()
+        obj_hash = id(obj)
+        if obj_hash in seen:
+            return 0
+        seen.add(obj_hash)
 
-    # end recursion
-    return size
+        # recurse
+        if isinstance(obj, dict):
+            size += sum([Utils.instance_size(_, seen)
+                         for _ in list(obj.keys()) + list(obj.values())])
+        elif hasattr(obj, '__dict__'):
+            size += Utils.instance_size(obj.__dict__, seen)
+        elif hasattr(obj, '__iter__') and not isinstance(obj, (str, bytes, bytearray)):
+            size += sum([Utils.instance_size(i, seen) for i in obj])
+
+        # end recursion
+        return size
+
+    @classmethod
+    def nested_dict(cls):
+        '''
+        Borrowed from user:andrew on StackOverflow
+        Creates a defaultdict of arbitrary depth
+
+        nice b/c it's a functional way of creating arbitrary depth
+        '''
+        from collections import defaultdict
+        return defaultdict(Utils.nested_dict)
 
 
 class Tree(object):
