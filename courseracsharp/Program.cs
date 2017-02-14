@@ -23,7 +23,6 @@ namespace Coursera
             Console.WriteLine(answer.score);
             Console.WriteLine(answer.v_aligned);
             Console.WriteLine(answer.w_aligned);
-
         }
     }
 }

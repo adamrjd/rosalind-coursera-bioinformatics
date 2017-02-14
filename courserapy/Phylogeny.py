@@ -7,8 +7,8 @@ Written in: Py35
 
 class Graph(object):
     '''Creates graphs in python collections from genetic data'''
-    from Utils import nested_dict
-    adjlist = nested_dict()
+    from Utils import Utils
+    adjlist = Utils.nested_dict()
     leaves = list()
     matrix = None
     phylogeny = None
@@ -109,8 +109,8 @@ class Graph(object):
         length = limb_length(n)
         #___ bald tree ___
         for _ in graph.adjlist.keys():
-            graph.adjlist[n - 1][_] -= length
-            if _ != n:
+            if _ != n - 1:
+                graph.adjlist[n - 1][_] -= length
                 graph.adjlist[_][n - 1] -= length
 
         i, k = None, None
@@ -140,16 +140,19 @@ class Graph(object):
         __ = 0
         for _ in range(v):
             __ += T.adjlist[0][_]
-            if __ > x:
-                # insert node
+            if x - __ == 0:
+                # attach node as leaf
                 (T.adjlist[_][v],
                  T.adjlist[v][_],
                  T.adjlist[v][v]) = length, length, 0
                 for node in list(i for i in range(v - 1) if i != _):
                     dist = int(dist_theorem(v, node, _))
                     T.adjlist[v][node] = dist
-        # self.leaves.append(max(self.leaves) + 1)
+                self.leaves.append(max(self.leaves) + 1)
+            elif x - __ < 0:
+                # insert node as internal node
 
+        print('yay')
         # return new adjlist
         self.phylogeny = T
         return T

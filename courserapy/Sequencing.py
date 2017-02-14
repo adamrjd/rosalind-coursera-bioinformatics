@@ -1,13 +1,8 @@
 from Parsing import MassTable, codons
-from os import getcwd
 
 lookup = MassTable()
 rbase = 'ACGU'
 base = 'ACGT'
-
-global lookup
-global rbase
-global base
 
 # ... SCRIPTS ......................................................
 # Manipulating graphs
@@ -504,7 +499,8 @@ def peptide_sequencing(spectrum, cyclic=False):
     aminoacids = list(m for m in spectrum if m in lookup.acids)
     length = len(aminoacids)
     peptides = permutations(aminoacids)
-    return [[lookup.get_mass(pep) for pep in peptide] for peptide in peptides if theoreticalspectrum(peptide, cyclic) == spectrum]
+    return [[lookup.get_mass(pep) for pep in peptide]
+            for peptide in peptides if theoreticalspectrum(peptide, cyclic) == spectrum]
 
 
 def spectrum_score(peptide, spectrum, cyclic=False):
